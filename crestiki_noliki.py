@@ -52,15 +52,9 @@ class Game:
 
 
     def check_win_condition(self):
-        pass
-
-game_1 = Game()
-game_1.set_sign(2, "o")
-game_1.set_sign(1, "x")
-game_1.set_sign(8, "x")
-game_1.display()
-print(game_1.crestiki, game_1.noliki)
-
-# inner_array = [1, 2, 3]
-# array = [2, 5, 3, 7, 8, 1]
-# print(all(element in array for element in inner_array))
+        for combination in self.win_combinations:
+            if all(element in self.crestiki for element in combination):
+                return "crestiki"
+            if all(element in self.noliki for element in combination):
+                return "noliki"
+        return False
