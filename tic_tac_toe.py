@@ -37,7 +37,7 @@ while True:
     game.display()
     print("\n")
     if game.check_win_condition() == "crestiki":
-        print("Player_1 wins")
+        print("Crosses wins")
         break
     elif not remaining_cells:
         print("Draw")
@@ -59,10 +59,8 @@ while True:
     game.display()
     print("\n")
     if game.check_win_condition() == "noliki":
-        print("Player_2 wins")
+        print("Noughts win")
         break
     elif not remaining_cells:
         print("Draw")
         break
-    
-
