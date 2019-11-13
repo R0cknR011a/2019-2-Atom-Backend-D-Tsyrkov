@@ -1,8 +1,22 @@
 from django.http import HttpResponseNotAllowed, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from attachments.models import Attachment
+from attachments.forms import AttachmentForm
 
 @csrf_exempt
-def attachments_list(request):
+def get_all(request):
     if (request.method == 'GET'):
-        return JsonResponse({'attachments': 'here should be attachments list'})
+        result = Attachment.objects.all().values()
+        return JsonResponse({'attachments': list(result)})
     return HttpResponseNotAllowed(['GET'])
+
+@csrf_exempt
+def create(request):
+    form = AttachmentForm(request.POST)
+    if form.is_valid():
+        attachment = form.save()
+        return JsonResponse({
+            'success': True,
+            'attachment ID': attachment.id
+        })
+    return JsonResponse({'errors': form.errors}, status=400)
