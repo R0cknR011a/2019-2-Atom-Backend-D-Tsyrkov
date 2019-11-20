@@ -6,6 +6,7 @@ from dialogs.models import Message
 @csrf_exempt
 def create(request):
     form = MessageForm(request.POST)
+    return form
     if form.is_valid():
         message = form.save()
         return JsonResponse({
@@ -28,3 +29,14 @@ def messages_with(request):
         result = Message.objects.filter(chat=chat).values()
         return JsonResponse({'result': list(result)})
     return HttpResponseNotAllowed(['GET'])
+
+@csrf_exempt
+def read_message(request):
+    if request.method == 'GET':
+        message = request.GET.get('message_id')
+        result = Message.objects.filter(id=message).values()
+        return JsonResponse({
+            'message': list(result)
+        })
+    return HttpResponseNotAllowed(['GET'])
+

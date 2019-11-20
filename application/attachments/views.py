@@ -20,3 +20,8 @@ def create(request):
             'attachment ID': attachment.id
         })
     return JsonResponse({'errors': form.errors}, status=400)
+
+@csrf_exempt
+def upload_file(request):
+    print(request.FILES.get('file'))
+    return JsonResponse({'success': True})
