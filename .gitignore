@@ -1,4 +1,6 @@
 venv/
+myenv/
+.idea/
 *.pyc
 *.swo
 *.swp
