@@ -6,3 +6,7 @@ class AttachmentForm(forms.ModelForm):
         model = Attachment
         fields = ['attach_type', 'url', 'chat', 'user']
 
+class AttachmentChatCreateForm(forms.ModelForm):
+    class Meta:
+        model = Attachment
+        fields = ['chat']

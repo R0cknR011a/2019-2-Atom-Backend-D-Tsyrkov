@@ -128,7 +128,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+AWS_S3_ENDPOINT_URL = 'http://hb.bizmrg.com'
+AWS_ACCESS_KEY_ID = '6Da62vVLUi6AKbFnnRoeA3'
+AWS_SECRET_ACCESS_KEY = 'gDYg4Bu15yUpNYGKmmpiVNGvLRWhUAJ3m1GGRvg8KTbU'
+AWS_STORAGE_BUCKET_NAME = 'tsyrkov_messanger_bucket'
+
 STATIC_URL = '/static/'
 
 AUTH_USER_MODEL = 'users.User'
-MEDIA = os.path.join(BASE_DIR, 'media')

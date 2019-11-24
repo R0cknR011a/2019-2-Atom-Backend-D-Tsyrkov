@@ -10,6 +10,7 @@ class Attachment(models.Model):
     attach_type = models.CharField(max_length=32, verbose_name='Тип')
     url = models.CharField(max_length=128, verbose_name='Адрес')
     key = models.CharField(max_length=128, null=True)
+    content = models.FileField(upload_to='attachments/', null=True)
 
     class Meta:
         verbose_name = 'Приложение'
