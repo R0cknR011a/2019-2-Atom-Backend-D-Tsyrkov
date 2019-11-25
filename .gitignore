@@ -1,6 +1,7 @@
 venv/
 myenv/
 .idea/
+migrations/
 *.pyc
 *.swo
 *.swp
