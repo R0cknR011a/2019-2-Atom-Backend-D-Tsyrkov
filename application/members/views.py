@@ -1,23 +1,29 @@
 from django.http import HttpResponseNotAllowed, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from members.forms import MemberForm
 from members.models import Member
+from rest_framework.decorators import api_view
+import json
 
-@csrf_exempt
+
+@api_view(['POST'])
 def create(request):
-    form = MemberForm(request.POST)
+    data = json.loads(request.body)
+    form = MemberForm(data)
     if form.is_valid():
         member = form.save()
         return JsonResponse({
             'success': True,
-            'chat ID': member.id
+            'chat ID': member.user.id
         })
     return JsonResponse({'errors': form.errors}, status=400)
 
-@csrf_exempt
-def get_all(request):
-    if (request.method == 'GET'):
-        result = Member.objects.all().values()
-        return JsonResponse({'members': list(result)})
-    return HttpResponseNotAllowed(['GET'])
 
+@api_view(['GET'])
+def get_all(request):
+    result = Member.objects.all().values()
+    return JsonResponse({'members': list(result)})
+
+@api_view(['POST'])
+def add_chat(request):
+    username = json.loads(request.body)
+    return JsonResponse({'username': username})

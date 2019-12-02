@@ -1,25 +1,45 @@
 from django.shortcuts import render
-from django.http import HttpResponseNotAllowed, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 from chats.models import Chat
-from chats.forms import ChatForm
+from users.models import User
+from members.models import Member
+from chats.forms import ChatForm, CreateChatForm
+from rest_framework.decorators import api_view
+import json
 
 
-@csrf_exempt
+@api_view(['POST'])
 def create_chat(request):
-    form = ChatForm(request.POST)
+    data = json.loads(request.body)
+    form = CreateChatForm(data)
     if form.is_valid():
-        chat = form.save()
+        chat = Chat(topic=data['topic'], is_group_chat=data['is_group_chat'])
+        chat.save()
+        user = User.objects.get(username=data['username'])
+        opponent = User.objects.get(username=data['opponent'])
+        member_1 = Member(chat=chat, user=user)
+        member_2 = Member(chat=chat, user=opponent)
+        member_1.save()
+        member_2.save()
         return JsonResponse({
             'success': True,
-            'chat ID': chat.id
+            'chat ID': [chat.id, member_1.id, member_2.id]
         })
     return JsonResponse({'errors': form.errors}, status=400)
 
-@csrf_exempt
+
+@api_view(['GET'])
 def get_all(request):
-    if (request.method == 'GET'):
-        result = Chat.objects.all().values()
-        return JsonResponse({'chats': list(result)})
-    return HttpResponseNotAllowed(['GET'])
+    user = User.objects.filter(username=request.GET['username']).get()
+    chats = Member.objects.filter(user=user)
+    result = []
+    for chat in chats:
+        result.append({
+            'opponent': Member.objects.exclude(user=user).get(chat=chat.chat).user.username,
+            'chat': {
+                'topic': chat.chat.topic,
+                'last_message': chat.chat.last_message,
+            },
+        })
+    return JsonResponse({'result': result})
 

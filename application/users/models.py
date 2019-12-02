@@ -3,10 +3,8 @@ from django.contrib.auth.models import AbstractUser
 
 
 class User(AbstractUser):
-    bio = models.TextField(max_length=500, verbose_name='Биография', blank=True)
+    avatar = models.ImageField(upload_to='users_avatars/', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
-
-

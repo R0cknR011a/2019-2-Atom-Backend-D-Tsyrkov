@@ -4,9 +4,5 @@ from attachments.models import Attachment
 class AttachmentForm(forms.ModelForm):
     class Meta:
         model = Attachment
-        fields = ['attach_type', 'url', 'chat', 'user']
+        fields = '__all__'
 
-class AttachmentChatCreateForm(forms.ModelForm):
-    class Meta:
-        model = Attachment
-        fields = ['chat']

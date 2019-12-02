@@ -1,17 +1,17 @@
-from django.http import HttpResponseNotAllowed, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 from users.models import User
+from members.models import Member
 from users.forms import UserForm
+from rest_framework.decorators import api_view
+import json
 
-@csrf_exempt
+@api_view(['GET'])
 def search_username(request):
-    if (request.method == 'GET'):
-        username = request.GET.get('username')
-        result = User.objects.filter(username__contains=username).values()
-        return JsonResponse({'users': list(result)})
-    return HttpResponseNotAllowed(['GET'])
+    username = request.GET.get('username')
+    result = User.objects.filter(username__contains=username).values()
+    return JsonResponse({'users': list(result)})
 
-@csrf_exempt
+@api_view(['POST'])
 def create(request):
     form = UserForm(request.POST)
     if form.is_valid():
@@ -22,10 +22,12 @@ def create(request):
         })
     return JsonResponse({'errors': form.errors}, status=400)
 
-@csrf_exempt
+@api_view(['GET'])
 def get_all(request):
-    if (request.method == 'GET'):
-        result = User.objects.all().values('id', 'username', 'bio')
-        return JsonResponse({'users': list(result)})
-    return HttpResponseNotAllowed(['GET'])
-
+    username = User.objects.get(username=request.GET['username'])
+    users = [element['username'] for element in User.objects.exclude(username=username).values()]
+    chats = [element['chat_id'] for element in Member.objects.filter(user=username).values()]
+    members = [element['user_id'] for element in Member.objects.filter(chat__in=chats).exclude(user=username).values()]
+    not_allowed_users = [element['username'] for element in User.objects.filter(id__in=members).values()]
+    result = [element for element in users if element not in not_allowed_users]
+    return JsonResponse({'users': result})
