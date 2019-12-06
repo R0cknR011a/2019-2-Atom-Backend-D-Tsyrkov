@@ -5,12 +5,14 @@ from attachments.forms import AttachmentForm
 from django.core.files.images import ImageFile
 from attachments.forms import AttachmentChatCreateForm
 
+
 @csrf_exempt
 def get_all(request):
-    if (request.method == 'GET'):
+    if request.method == 'GET':
         result = Attachment.objects.all().values()
         return JsonResponse({'attachments': list(result)})
     return HttpResponseNotAllowed(['GET'])
+
 
 @csrf_exempt
 def create(request):
@@ -22,6 +24,7 @@ def create(request):
             'attachment ID': attachment.id
         })
     return JsonResponse({'errors': form.errors}, status=400)
+
 
 @csrf_exempt
 def upload_file(request):

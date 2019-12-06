@@ -3,6 +3,7 @@ from chats.models import Chat
 from dialogs.models import Message
 from django.conf import settings
 
+
 class Attachment(models.Model):
     chat = models.ForeignKey(Chat, on_delete=models.SET_NULL, null=True, verbose_name='Чат')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name='Пользователь')
