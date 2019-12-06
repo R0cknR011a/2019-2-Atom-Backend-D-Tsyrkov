@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from dialogs.forms import MessageForm
+from dialogs.forms import MessageForm, ReadMessageForm
 from dialogs.models import Message
 from members.models import Member
 from chats.models import Chat
@@ -15,15 +15,18 @@ def create(request):
         user = User.objects.get(username=request.POST['username'])
         chats = Member.objects.filter(user=user)
         for chat in chats:
-            op = Member.objects.filter(chat=chat.chat).exclude(user=user).get().user.username
-            if op == request.POST['opponent']:
+            op = Member.objects.filter(chat=chat.chat).exclude(user=user).get()
+            if op.user.username == request.POST['opponent']:
                 result = chat.chat
                 break
         message = Message(content=request.POST['content'], chat=result, user=user, added_at=request.POST['date'])
         message.save()
         response = [message.id]
-        result.last_message = request.POST['content']
+        result.last_message = '(' + request.POST['attach_type'] + ') ' +\
+            request.POST['content'] if request.POST['attach_type'] != 'none' else request.POST['content']
         result.save()
+        chat.last_read_message = Message.objects.filter(chat=result).filter(user=op.user).last()
+        chat.save()
         if request.POST['attach_type'] == 'geolocation':
             attachment = Attachment(
                 chat=result,
@@ -72,33 +75,53 @@ def get_all(request):
         aws_secret_access_key='gDYg4Bu15yUpNYGKmmpiVNGvLRWhUAJ3m1GGRvg8KTbU',
     )
     username = User.objects.get(username=request.GET['username'])
+    opponent = User.objects.get(username=request.GET['opponent'])
     chats = Member.objects.filter(user=username)
     for chat in chats:
-        op = Member.objects.filter(chat=chat.chat).exclude(user=username).get().user.username
-        if op == request.GET['opponent']:
+        op = Member.objects.filter(chat=chat.chat).exclude(user=username).get()
+        if op.user.username == request.GET['opponent']:
             curr_chat = chat.chat
             break
     messages = Message.objects.filter(chat=curr_chat)
+    me = Member.objects.filter(chat=curr_chat).filter(user=username).get()
+    op_last_message = Message.objects.filter(chat=curr_chat).filter(user=op.user).last()
+    me.last_read_message = op_last_message
+    me.save()
+    op_last_read_message = op.last_read_message
     result = []
     for message in messages:
+        avatar = s3_client.generate_presigned_url('get_object', Params={
+                    'Bucket': 'tsyrkov_messanger_bucket',
+                    'Key': message.user.avatar,
+                }, ExpiresIn=3600)
         data = {
             'author': message.user.username,
             'message': message.content,
             'time': message.added_at,
+            'avatar': avatar,
             'attachments': {}
         }
+        if message.user == username:
+            if op_last_read_message == None:
+                data['read'] = False
+            else:
+                if message.id > op_last_read_message.id:
+                    data['read'] = False
+                else:
+                    data['read'] = True
+        if message.user == opponent:
+            data['read'] = True
         attachments = Attachment.objects.filter(chat=curr_chat).filter(message=message)
         if len(attachments) > 0:
-            if len(attachments) == 1:
-                if attachments[0].attach_type == 'geolocation':
-                    data['attachments']['type'] = 'geolocation'
-                    data['attachments']['url'] = attachments[0].url
-                else:
-                    data['attachments']['type'] = 'audio'
-                    data['attachments']['url'] = s3_client.generate_presigned_url('get_object', Params={
-                        'Bucket': 'tsyrkov_messanger_bucket',
-                        'Key': attachments[0].url,
-                    }, ExpiresIn=3600)
+            if attachments[0].attach_type == 'geolocation':
+                data['attachments']['type'] = 'geolocation'
+                data['attachments']['url'] = attachments[0].url
+            elif attachments[0].attach_type == 'audio':
+                data['attachments']['type'] = 'audio'
+                data['attachments']['url'] = s3_client.generate_presigned_url('get_object', Params={
+                    'Bucket': 'tsyrkov_messanger_bucket',
+                    'Key': attachments[0].url,
+                }, ExpiresIn=3600)
             else:
                 arr = []
                 for attach in attachments:
@@ -112,17 +135,21 @@ def get_all(request):
     return JsonResponse({'messages': result})
 
 
-@api_view(['GET'])
-def messages_with(request):
-    chat = request.GET.get('chat_id')
-    result = Message.objects.filter(chat=chat).values()
-    return JsonResponse({'result': list(result)})
-
-
 @api_view(['POST'])
 def read_message(request):
-    message = request.GET.get('message_id')
-    result = Message.objects.filter(id=message).values()
-    return JsonResponse({
-        'message': list(result)
-    })
+    form = ReadMessageForm(request.POST)
+    if form.is_valid():
+        user = User.objects.get(username=request.POST['username'])
+        chats = Member.objects.filter(user=user)
+        for chat in chats:
+            op = Member.objects.filter(chat=chat.chat).exclude(user=user).get()
+            if op.user.username == request.POST['opponent']:
+                curr_chat = chat.chat
+                break
+        message = Message.objects.filter(chat=curr_chat)[int(request.POST['message_key'])]
+        member = Member.objects.filter(user=user).filter(chat=curr_chat).get()
+        member.last_read_message = message
+        member.save()
+        return JsonResponse({
+            'message': member.last_read_message.id
+        })

@@ -7,3 +7,8 @@ class MessageForm(forms.Form):
     content = forms.CharField(required=False)
     date = forms.DateTimeField()
     attach_type = forms.CharField(max_length=16, required=False)
+
+class ReadMessageForm(forms.Form):
+    username = forms.CharField(max_length=16)
+    opponent = forms.CharField(max_length=16)
+    message_key = forms.CharField()
