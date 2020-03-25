@@ -1,15 +1,19 @@
 from django.http import JsonResponse
 from users.models import User
 from members.models import Member
+from dialogs.models import Message
 from users.forms import UserForm, UserAvatarForm
 from rest_framework.decorators import api_view
 import boto3
+import jwt
+
 
 @api_view(['GET'])
 def search_username(request):
     username = request.GET['username']
     result = [elem.username for elem in User.objects.exclude(username=username)]
     return JsonResponse({'users': result})
+
 
 @api_view(['POST'])
 def create(request):
@@ -22,15 +26,21 @@ def create(request):
         })
     return JsonResponse({'errors': form.errors}, status=400)
 
+
+def empty_chat(chat):
+    return Message.objects.filter(chat=chat).count() != 0
+
+
+def opponent_username(chat, user):
+    return Member.objects.filter(chat=chat).exclude(user=user).get().user.username
+
+
 @api_view(['GET'])
 def get_all(request):
     user = User.objects.get(username=request.GET['username'])
     other_users = [elem.username for elem in User.objects.exclude(username=user)]
-    all_chats = []
-    chats = Member.objects.filter(user=user)
-    for chat in chats:
-        all_chats.append(chat.chat)
-    exist_chats = [Member.objects.filter(chat=elem).exclude(user=user).get().user.username for elem in all_chats]
+    all_chats = [elem.chat for elem in Member.objects.filter(user=user)]
+    exist_chats = [opponent_username(elem, user) for elem in all_chats if empty_chat(elem)]
     result = [elem for elem in other_users if elem not in exist_chats]
     print(other_users, exist_chats)
     return JsonResponse({'users': result})
@@ -56,6 +66,7 @@ def get_settings(request):
         'bio': user.bio,
     }
     return JsonResponse({'result': result})
+
 
 @api_view(['POST'])
 def set_settings(request):

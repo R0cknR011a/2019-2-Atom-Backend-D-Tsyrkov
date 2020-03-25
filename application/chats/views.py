@@ -13,20 +13,49 @@ import boto3
 def create_chat(request):
     form = CreateChatForm(request.POST)
     if form.is_valid():
+        session = boto3.session.Session()
+        user = User.objects.get(username=request.POST['username'])
+        opponent = User.objects.get(username=request.POST['opponent'])
+        user_chats = [elem.chat for elem in Member.objects.filter(user=user)]
+        s3_client = session.client(
+            service_name='s3',
+            endpoint_url='http://hb.bizmrg.com',
+            aws_access_key_id='6Da62vVLUi6AKbFnnRoeA3',
+            aws_secret_access_key='gDYg4Bu15yUpNYGKmmpiVNGvLRWhUAJ3m1GGRvg8KTbU',
+        )
+        avatar = s3_client.generate_presigned_url('get_object', Params={
+            'Bucket': 'tsyrkov_messanger_bucket',
+            'Key': opponent.avatar,
+        }, ExpiresIn=3600)
+        topic = request.POST['username'] + ' with ' + request.POST['opponent']
+        for chat in user_chats:
+            if Member.objects.filter(chat=chat).filter(user=opponent).exists():
+                return JsonResponse({
+                    'opponent': opponent.username,
+                    'avatar': avatar,
+                    'author': '',
+                    'last_message': '',
+                    'read': False,
+                    'topic': topic,
+                    'date': '',
+                })
         chat = Chat(
-            topic=request.POST['username'] + ' with ' + request.POST['opponent'],
+            topic=topic,
             is_group_chat=False,
         )
         chat.save()
-        user = User.objects.get(username=request.POST['username'])
-        opponent = User.objects.get(username=request.POST['opponent'])
         member_1 = Member(chat=chat, user=user)
         member_2 = Member(chat=chat, user=opponent)
         member_1.save()
         member_2.save()
         return JsonResponse({
-            'success': True,
-            'chat ID': [chat.id, member_1.id, member_2.id]
+            'opponent': opponent.username,
+            'avatar': avatar,
+            'author': '',
+            'last_message': '',
+            'read': False,
+            'topic': topic,
+            'date': '',
         })
     return JsonResponse({'errors': form.errors}, status=400)
 
@@ -52,6 +81,7 @@ def get_all(request):
                     }, ExpiresIn=3600)
         curr_chat['avatar'] = avatar
         curr_chat['opponent'] = opponent.user.username
+        curr_chat['topic'] = chat.chat.topic
         messages = Message.objects.filter(chat=chat.chat)
         if len(messages) == 0:
             curr_chat['author'] = ''
@@ -61,7 +91,7 @@ def get_all(request):
         else:
             last_message = messages.last()
             if last_message.user == user:
-                if opponent.last_read_message == None:
+                if opponent.last_read_message is None:
                     read = False
                 else:
                     if last_message.id > opponent.last_read_message.id:
@@ -69,8 +99,8 @@ def get_all(request):
                     else:
                         read = True
             if last_message.user == opponent.user:
-                if chat.last_read_message == None:
-                    read=False
+                if chat.last_read_message is None:
+                    read = False
                 else:
                     if last_message.id > chat.last_read_message.id:
                         read = False

@@ -7,5 +7,5 @@ urlpatterns = [
     path('create/', create, name='create'),
     path('get_settings/', get_settings, name="get_settings"),
     path('set_settings/', set_settings, name="set_settings"),
-    path('set_avatar/', set_avatar, name="set_avatar"),
+    path('set_avatar/', set_avatar, name="set_avatar")
 ]

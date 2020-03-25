@@ -7,11 +7,22 @@ from users.models import User
 from attachments.models import Attachment
 from rest_framework.decorators import api_view
 import boto3
+import json
+import requests
+
+API_KEY = '2954bfc0-ded7-4d0f-a931-285e3bc63159'
 
 @api_view(['POST'])
 def create(request):
     form = MessageForm(request.POST)
     if form.is_valid():
+        session = boto3.session.Session()
+        s3_client = session.client(
+            service_name='s3',
+            endpoint_url='http://hb.bizmrg.com',
+            aws_access_key_id='6Da62vVLUi6AKbFnnRoeA3',
+            aws_secret_access_key='gDYg4Bu15yUpNYGKmmpiVNGvLRWhUAJ3m1GGRvg8KTbU',
+        )
         user = User.objects.get(username=request.POST['username'])
         chats = Member.objects.filter(user=user)
         for chat in chats:
@@ -27,6 +38,8 @@ def create(request):
         result.save()
         chat.last_read_message = Message.objects.filter(chat=result).filter(user=op.user).last()
         chat.save()
+        attachs = {}
+        attachs['type'] = request.POST['attach_type']
         if request.POST['attach_type'] == 'geolocation':
             attachment = Attachment(
                 chat=result,
@@ -36,31 +49,79 @@ def create(request):
                 url=request.POST['content'],
             )
             attachment.save()
+            attachs['url'] = attachment.url
             response.append(attachment.id)
-        if len(request.FILES) > 0:
-            session = boto3.session.Session()
-            s3_client = session.client(
-                service_name='s3',
-                endpoint_url='http://hb.bizmrg.com',
-                aws_access_key_id='6Da62vVLUi6AKbFnnRoeA3',
-                aws_secret_access_key='gDYg4Bu15yUpNYGKmmpiVNGvLRWhUAJ3m1GGRvg8KTbU',
-		    )
-            for file in request.FILES:
-                key = 'attachments/' + request.POST['attach_type'] + 's/' + result.topic + '/' + str(hash(file))
-                s3_client.put_object(
-                    Bucket = 'tsyrkov_messanger_bucket',
-                    Key = key,
-                    Body = request.FILES[file],
-                )
-                attachment = Attachment(
-                    chat=result,
-                    user=user,
-                    message=message,
-                    attach_type=request.POST['attach_type'],
-                    url=key,
-                )
-                attachment.save()
-                response.append(attachment.id)
+        else:
+            attachs['url'] = []
+
+        for file in request.FILES:
+            key = 'attachments/' + request.POST['attach_type'] + result.topic + '/' + str(hash(file))
+            s3_client.put_object(
+                Bucket='tsyrkov_messanger_bucket',
+                Key=key,
+                Body=request.FILES[file],
+            )
+            attachment = Attachment(
+                chat=result,
+                user=user,
+                message=message,
+                attach_type=request.POST['attach_type'],
+                url=key,
+            )
+            attachment.save()
+            attachs['url'].append(s3_client.generate_presigned_url('get_object', Params={
+                'Bucket': 'tsyrkov_messanger_bucket',
+                'Key': attachment.url,
+            }, ExpiresIn=3600))
+            response.append(attachment.id)
+
+        # send message to client
+        if attachs['type'] == 'audio':
+            attachs['url'] = attachs['url'][0]
+        avatar = s3_client.generate_presigned_url('get_object', Params={
+            'Bucket': 'tsyrkov_messanger_bucket',
+            'Key': message.user.avatar,
+        }, ExpiresIn=3600)
+        command_1 = {
+            'method': 'publish',
+            'params': {
+                'channel': op.user.username + '_with_' + user.username,
+                'data': {
+                    'avatar': avatar,
+                    'opponent': message.user.username,
+                    'topic': result.topic,
+                    'author': message.user.username,
+                    'last_message': result.last_message,
+                    'read': False,
+                    'date': 'T'.join(message.added_at.split(' ')),
+                    'message': message.content,
+                    'attachments': attachs,
+                }
+            }
+        }
+        command_2 = {
+            'method': 'publish',
+            'params': {
+                'channel': op.user.username,
+                'data': {
+                    'avatar': avatar,
+                    'opponent': message.user.username,
+                    'topic': result.topic,
+                    'author': message.user.username,
+                    'last_message': result.last_message,
+                    'read': False,
+                    'date': 'T'.join(message.added_at.split(' ')),
+                    'message': message.content,
+                    'attachments': attachs,
+                }
+            }
+        }
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'apikey ' + API_KEY,
+        }
+        requests.post(url='http://localhost:9000/api', data=json.dumps(command_1), headers=headers)
+        requests.post(url='http://localhost:9000/api', data=json.dumps(command_2), headers=headers)
         return JsonResponse({'success': response})
     return JsonResponse({'errors': form.errors}, status=400)
 
@@ -97,12 +158,12 @@ def get_all(request):
         data = {
             'author': message.user.username,
             'message': message.content,
-            'time': message.added_at,
+            'date': message.added_at,
             'avatar': avatar,
             'attachments': {}
         }
         if message.user == username:
-            if op_last_read_message == None:
+            if op_last_read_message is None:
                 data['read'] = False
             else:
                 if message.id > op_last_read_message.id:
@@ -131,6 +192,22 @@ def get_all(request):
                     }, ExpiresIn=3600))
                 data['attachments']['type'] = 'images'
                 data['attachments']['url'] = arr
+
+        # send notification to client
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'apikey ' + API_KEY,
+        }
+        command = {
+            'method': 'publish',
+            'params': {
+                'channel': op.user.username + '_notify',
+                'data': {
+                    'opponent': username.username,
+                }
+            }
+        }
+        requests.post(url='http://localhost:9000/api', data=json.dumps(command), headers=headers)
         result.append(data)
     return JsonResponse({'messages': result})
 
@@ -146,10 +223,33 @@ def read_message(request):
             if op.user.username == request.POST['opponent']:
                 curr_chat = chat.chat
                 break
-        message = Message.objects.filter(chat=curr_chat)[int(request.POST['message_key'])]
+        message = Message.objects.filter(chat=curr_chat).last()
         member = Member.objects.filter(user=user).filter(chat=curr_chat).get()
         member.last_read_message = message
         member.save()
-        return JsonResponse({
-            'message': member.last_read_message.id
-        })
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'apikey ' + API_KEY,
+        }
+        command_1 = {
+            'method': 'publish',
+            'params': {
+                'channel': op.user.username + '_notify',
+                'data': {
+                    'opponent': user.username,
+                }
+            }
+        }
+        command_2 = {
+            'method': 'publish',
+            'params': {
+                'channel': user.username + '_notify',
+                'data': {
+                    'opponent': op.user.username,
+                }
+            }
+        }
+        requests.post(url='http://localhost:9000/api', data=json.dumps(command_1), headers=headers)
+        requests.post(url='http://localhost:9000/api', data=json.dumps(command_2), headers=headers)
+        return JsonResponse({'message': member.last_read_message.content})
+    return JsonResponse({'errors': form.errors}, status=400)

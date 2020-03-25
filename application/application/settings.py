@@ -183,7 +183,7 @@ AWS_STORAGE_BUCKET_NAME = 'tsyrkov_messanger_bucket'
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-	os.path.join(BASE_DIR, 'static'),
+    os.path.join(BASE_DIR, 'static'),
 ]
 
 AUTH_USER_MODEL = 'users.User'
